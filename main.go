@@ -4,19 +4,54 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"os"
+	"slices"
+	//"fmt"
 )
 
 var db = make(map[string]string)
 
 type Customer struct {
-	Name  string
-	Phone string
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+}
+
+func CreateJsonFile(c []Customer){
+	b, err := json.Marshal(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create("/tmp/customers.json")
+	if err != nil {
+			log.Fatal(err)
+	}
+	defer f.Close()
+	f.Write(b)
 }
 
 func GetAllCustomers() []Customer {
+	emptyReturnArray := make([]Customer, 0, 0)
+	content, err := ioutil.ReadFile("/tmp/customers.json")
+	if err != nil {
+			//log.Fatal("Error when opening file: ", err)
+			CreateJsonFile(emptyReturnArray)
+			return emptyReturnArray
+	}
+
+	// Now let's unmarshall the data into `payload`
+	var customers []Customer
+	err = json.Unmarshal(content, &customers)
+	if err != nil {
+			//log.Fatal("Error during Unmarshal(): ", err)
+			CreateJsonFile(emptyReturnArray)
+			return emptyReturnArray
+	}
 	// fancy business logic
 	//var return_list =
-	return []Customer{Customer{Name: "Hans Peter", Phone: "43546789645"}, Customer{Name: "Rudi Voeller", Phone: "1234567890"}}
+	return customers
 }
 
 func setupRouter() *gin.Engine {
@@ -45,51 +80,22 @@ func setupRouter() *gin.Engine {
 		c.String(http.StatusOK, "pong")
 	})
 
-	// Get user value
-	r.GET("/user/:name", func(c *gin.Context) {
-		user := c.Params.ByName("name")
-		value, ok := db[user]
-		if ok {
-			c.JSON(http.StatusOK, gin.H{"user": user, "value": value})
-		} else {
-			c.JSON(http.StatusOK, gin.H{"user": user, "status": "no value"})
+	r.POST("/customers", func(c *gin.Context) {
+		phone := c.Params.ByName("phone")
+		name := c.Params.ByName("name")
+
+		customers := GetAllCustomers()
+		newCustomers := make([]Customer, 0, 0)
+		for _, customer := range customers {
+			if customer.Phone != phone {
+				slices.Insert(newCustomers, 0, Customer{Name: customer.Name, Phone: customer.Phone})
+			}
 		}
+		slices.Insert(newCustomers, 0, Customer{Name: name, Phone: phone})
+		//TODO i am to dumb this array is still empty
+		CreateJsonFile(newCustomers)
 	})
 
-	// Authorized group (uses gin.BasicAuth() middleware)
-	// Same than:
-	// authorized := r.Group("/")
-	// authorized.Use(gin.BasicAuth(gin.Credentials{
-	//	  "foo":  "bar",
-	//	  "manu": "123",
-	//}))
-	authorized := r.Group("/", gin.BasicAuth(gin.Accounts{
-		"foo":  "bar", // user:foo password:bar
-		"manu": "123", // user:manu password:123
-	}))
-
-	/* example curl for /admin with basicauth header
-	   Zm9vOmJhcg== is base64("foo:bar")
-
-		curl -X POST \
-	  	http://localhost:8080/admin \
-	  	-H 'authorization: Basic Zm9vOmJhcg==' \
-	  	-H 'content-type: application/json' \
-	  	-d '{"value":"bar"}'
-	*/
-	authorized.POST("admin", func(c *gin.Context) {
-		user := c.MustGet(gin.AuthUserKey).(string)
-
-		// Parse JSON
-		var json struct {
-			Value string `json:"value" binding:"required"`
-		}
-
-		if c.Bind(&json) == nil {
-			db[user] = json.Value
-			c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		}
-	})
 
 	return r
 }
