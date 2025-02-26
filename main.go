@@ -8,10 +8,25 @@ import (
 
 var db = make(map[string]string)
 
+type Customer struct {
+	Name  string
+	Phone string
+}
+
+func GetAllCustomers() []Customer {
+	// fancy business logic
+	//var return_list =
+	return []Customer{Customer{Name: "Hans Peter", Phone: "43546789645"}, Customer{Name: "Rudi Voeller", Phone: "1234567890"}}
+}
+
 func setupRouter() *gin.Engine {
 	// Disable Console Color
 	// gin.DisableConsoleColor()
 	r := gin.Default()
+
+	r.GET("/customers", func(c *gin.Context) {
+		c.IndentedJSON(http.StatusOK, GetAllCustomers())
+	})
 
 	// Ping test
 	r.GET("/ping", func(c *gin.Context) {
