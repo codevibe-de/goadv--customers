@@ -28,6 +28,18 @@ func setupRouter() *gin.Engine {
 		c.IndentedJSON(http.StatusOK, GetAllCustomers())
 	})
 
+	r.GET("/customer/:phone", func(c *gin.Context) {
+		phone := c.Params.ByName("phone")
+		customers := GetAllCustomers()
+		for _, customer := range customers {
+			if customer.Phone == phone {
+				c.JSON(http.StatusOK, customer)
+				return
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"status": "no customer found"})
+	})
+
 	// Ping test
 	r.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong")
